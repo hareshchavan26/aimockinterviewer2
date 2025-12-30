@@ -5,15 +5,15 @@ import rateLimit from 'express-rate-limit';
 import { Pool } from 'pg';
 import { config } from './config';
 import { logger } from './utils/logger';
-import { SubscriptionController } from './controllers/subscription';
-import { WebhookController } from './controllers/webhook';
-import { UpgradePromptController } from './controllers/upgrade-prompt';
-import { InterviewDemoController } from './controllers/interview-demo';
-import { DefaultSubscriptionService } from './services/subscription';
-import { StripePaymentService } from './services/payment';
-import { UsageEnforcementService } from './services/usage-enforcement';
-import { DatabaseSubscriptionRepository } from './database/subscription-repository';
-import { createFeatureAccessMiddleware } from './middleware/feature-access';
+import { InterviewConfigController } from './controllers/interview-config-controller';
+import { SessionController } from './controllers/session-controller';
+import { DefaultInterviewConfigService } from './services/interview-config-service';
+import { DatabaseInterviewConfigRepository } from './repositories/interview-config-repository';
+import aiInterviewerRoutes from './routes/ai-interviewer-routes';
+import { textAnalysisRoutes } from './routes/text-analysis-routes';
+import { speechAnalysisRoutes } from './routes/speech-analysis-routes';
+import { emotionFacialAnalysisRoutes } from './routes/emotion-facial-analysis-routes';
+import realTimeAnalysisRoutes from './routes/real-time-analysis-routes';
 
 export function createApp(pool: Pool) {
   const app = express();
@@ -33,35 +33,17 @@ export function createApp(pool: Pool) {
   });
   app.use('/api/', limiter);
 
-  // Webhook endpoint needs raw body
-  app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
-  
-  // JSON parsing for other endpoints
+  // JSON parsing
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
 
   // Initialize services
-  const repository = new DatabaseSubscriptionRepository(pool);
-  const paymentService = new StripePaymentService(
-    repository,
-    config.stripe.secretKey,
-    config.stripe.webhookSecret
-  );
-  const subscriptionService = new DefaultSubscriptionService(repository);
-  const usageEnforcementService = new UsageEnforcementService(subscriptionService);
-
-  // Initialize middleware
-  const featureAccessMiddleware = createFeatureAccessMiddleware(subscriptionService);
+  const repository = new DatabaseInterviewConfigRepository(pool);
+  const configService = new DefaultInterviewConfigService(repository);
 
   // Initialize controllers
-  const subscriptionController = new SubscriptionController(subscriptionService, paymentService);
-  const webhookController = new WebhookController(paymentService);
-  const upgradePromptController = new UpgradePromptController(subscriptionService, usageEnforcementService);
-  const interviewDemoController = new InterviewDemoController(subscriptionService, usageEnforcementService);
-
-  // Make services available to middleware
-  app.locals.subscriptionService = subscriptionService;
-  app.locals.usageEnforcementService = usageEnforcementService;
+  const configController = new InterviewConfigController(configService);
+  const sessionController = new SessionController(configService);
 
   // Mock authentication middleware (in real app, this would validate JWT tokens)
   app.use('/api', (req: any, res, next) => {
@@ -70,66 +52,56 @@ export function createApp(pool: Pool) {
     next();
   });
 
-  // Add subscription context to all API requests
-  app.use('/api', featureAccessMiddleware.addSubscriptionContext());
-
   // Health check
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      service: 'interview-service',
+    });
   });
 
-  // Webhook routes (must be before other middleware)
-  app.post('/api/webhooks/stripe', (req, res) => webhookController.handleStripeWebhook(req, res));
+  // Configuration routes
+  app.post('/api/configs', (req, res) => configController.createConfiguration(req, res));
+  app.get('/api/configs/:configId', (req, res) => configController.getConfiguration(req, res));
+  app.get('/api/users/:userId/configs', (req, res) => configController.getUserConfigurations(req, res));
+  app.put('/api/configs/:configId', (req, res) => configController.updateConfiguration(req, res));
+  app.delete('/api/configs/:configId', (req, res) => configController.deleteConfiguration(req, res));
+  app.post('/api/configs/validate', (req, res) => configController.validateConfiguration(req, res));
 
-  // Subscription routes
-  app.post('/api/subscriptions', (req, res) => subscriptionController.createSubscription(req, res));
-  app.get('/api/subscriptions/:subscriptionId', (req, res) => subscriptionController.getSubscription(req, res));
-  app.put('/api/subscriptions/:subscriptionId', (req, res) => subscriptionController.updateSubscription(req, res));
-  app.delete('/api/subscriptions/:subscriptionId', (req, res) => subscriptionController.cancelSubscription(req, res));
-  
-  // User subscription routes
-  app.get('/api/users/:userId/subscription', (req, res) => subscriptionController.getUserSubscription(req, res));
-  
-  // Usage tracking routes
-  app.post('/api/usage/track', (req, res) => subscriptionController.trackUsage(req, res));
-  app.get('/api/subscriptions/:subscriptionId/usage', (req, res) => subscriptionController.getCurrentUsage(req, res));
-  app.get('/api/subscriptions/:subscriptionId/usage/check', (req, res) => subscriptionController.checkUsageLimit(req, res));
-  
-  // Usage enforcement routes
-  app.get('/api/subscriptions/:subscriptionId/usage/summary', async (req, res) => {
-    try {
-      const summary = await usageEnforcementService.getUsageSummary(req.params.subscriptionId);
-      res.json(summary);
-    } catch (error) {
-      logger.error('Failed to get usage summary', { error });
-      res.status(500).json({ error: 'Failed to get usage summary' });
-    }
-  });
+  // Template routes
+  app.get('/api/templates/:templateId', (req, res) => configController.getTemplate(req, res));
+  app.get('/api/templates', (req, res) => configController.searchTemplates(req, res));
+  app.get('/api/templates/role/:role', (req, res) => configController.getTemplatesByRole(req, res));
+  app.get('/api/templates/industry/:industry', (req, res) => configController.getTemplatesByIndustry(req, res));
 
-  app.get('/api/subscriptions/:subscriptionId/usage/warnings', async (req, res) => {
-    try {
-      const warnings = await usageEnforcementService.getUsageWarnings(req.params.subscriptionId);
-      res.json({ warnings });
-    } catch (error) {
-      logger.error('Failed to get usage warnings', { error });
-      res.status(500).json({ error: 'Failed to get usage warnings' });
-    }
-  });
+  // Session routes
+  app.post('/api/sessions', (req, res) => sessionController.createSession(req, res));
+  app.get('/api/sessions/:sessionId', (req, res) => sessionController.getSession(req, res));
+  app.get('/api/users/:userId/sessions', (req, res) => sessionController.getUserSessions(req, res));
+  app.post('/api/sessions/:sessionId/control', (req, res) => sessionController.controlSession(req, res));
+  app.get('/api/sessions/:sessionId/status', (req, res) => sessionController.getSessionStatus(req, res));
+  app.get('/api/sessions/:sessionId/current-question', (req, res) => sessionController.getCurrentQuestion(req, res));
+  app.get('/api/sessions/:sessionId/time-limits', (req, res) => sessionController.checkTimeLimits(req, res));
 
-  // Upgrade prompt routes
-  app.get('/api/users/:userId/upgrade/recommendation', (req, res) => upgradePromptController.getUpgradeRecommendation(req, res));
-  app.get('/api/users/:userId/upgrade/should-show', (req, res) => upgradePromptController.shouldShowUpgradePrompt(req, res));
-  app.get('/api/subscriptions/:subscriptionId/upgrade/suggestions', (req, res) => upgradePromptController.getUsageBasedSuggestions(req, res));
-  app.get('/api/users/:userId/upgrade/plan-comparison', (req, res) => upgradePromptController.getPlanComparison(req, res));
-  app.post('/api/upgrade/track-interaction', (req, res) => upgradePromptController.trackUpgradePromptInteraction(req, res));
-  
-  // Payment retry routes
-  app.post('/api/subscriptions/:subscriptionId/retry-payment', (req, res) => subscriptionController.retryFailedPayment(req, res));
+  // Response routes
+  app.post('/api/sessions/:sessionId/responses', (req, res) => sessionController.submitResponse(req, res));
+  app.get('/api/sessions/:sessionId/responses', (req, res) => sessionController.getSessionResponses(req, res));
 
-  // Demo interview routes (showing integration with usage limits and feature gating)
-  app.get('/api/interviews/can-start', (req, res) => interviewDemoController.canStartInterview(req, res));
-  app.post('/api/interviews/start', (req, res) => interviewDemoController.startInterview(req, res));
-  app.get('/api/analytics/advanced', (req, res) => interviewDemoController.getAdvancedAnalytics(req, res));
+  // AI Interviewer routes
+  app.use('/api/ai-interviewer', aiInterviewerRoutes);
+
+  // Text Analysis routes
+  app.use('/api/text-analysis', textAnalysisRoutes);
+
+  // Speech Analysis routes
+  app.use('/api/speech-analysis', speechAnalysisRoutes);
+
+  // Emotion and Facial Analysis routes
+  app.use('/api/emotion-facial-analysis', emotionFacialAnalysisRoutes);
+
+  // Real-Time Analysis routes
+  app.use('/api/real-time-analysis', realTimeAnalysisRoutes);
 
   // Error handling middleware
   app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

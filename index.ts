@@ -27,29 +27,37 @@ async function startServer() {
 
     // Start server
     const server = app.listen(config.port, () => {
-      logger.info(`Billing service started on port ${config.port}`);
+      logger.info(`Interview service started on port ${config.port}`, {
+        port: config.port,
+        environment: process.env.NODE_ENV || 'development',
+        database: {
+          host: config.database.host,
+          port: config.database.port,
+          name: config.database.name,
+        },
+      });
     });
 
     // Graceful shutdown
-    process.on('SIGTERM', async () => {
-      logger.info('SIGTERM received, shutting down gracefully');
-      server.close(() => {
-        pool.end(() => {
-          logger.info('Server and database connections closed');
+    const gracefulShutdown = async (signal: string) => {
+      logger.info(`Received ${signal}, shutting down gracefully`);
+      
+      server.close(async () => {
+        logger.info('HTTP server closed');
+        
+        try {
+          await pool.end();
+          logger.info('Database pool closed');
           process.exit(0);
-        });
+        } catch (error) {
+          logger.error('Error during shutdown', { error });
+          process.exit(1);
+        }
       });
-    });
+    };
 
-    process.on('SIGINT', async () => {
-      logger.info('SIGINT received, shutting down gracefully');
-      server.close(() => {
-        pool.end(() => {
-          logger.info('Server and database connections closed');
-          process.exit(0);
-        });
-      });
-    });
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   } catch (error) {
     logger.error('Failed to start server', { error });
@@ -57,4 +65,5 @@ async function startServer() {
   }
 }
 
+// Start the server
 startServer();
