@@ -1,39 +1,60 @@
-import { createApp, setupGracefulShutdown } from './app';
-import { db, redis } from './database/connection';
+import { Pool } from 'pg';
+import { createApp } from './app';
 import { config } from './config';
 import { logger } from './utils/logger';
 
-const startServer = async () => {
+async function startServer() {
   try {
-    logger.info('Starting AI Interview Platform - Authentication Service');
-    
-    // Initialize database connections
-    logger.info('Connecting to database...');
-    // Database connection is initialized when first used
-    
-    logger.info('Connecting to Redis...');
-    await redis.connect();
-    
+    // Initialize database connection
+    const pool = new Pool({
+      host: config.database.host,
+      port: config.database.port,
+      database: config.database.name,
+      user: config.database.user,
+      password: config.database.password,
+      ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+
+    // Test database connection
+    await pool.query('SELECT NOW()');
+    logger.info('Database connection established');
+
     // Create Express app
-    const app = await createApp();
-    
+    const app = createApp(pool);
+
     // Start server
     const server = app.listen(config.port, () => {
-      logger.info(`Auth service listening on port ${config.port}`);
-      logger.info(`Environment: ${config.nodeEnv}`);
-      logger.info(`Base URL: ${config.baseUrl}`);
+      logger.info(`Billing service started on port ${config.port}`);
     });
-    
-    // Setup graceful shutdown
-    setupGracefulShutdown(server);
-    
-    logger.info('Auth service started successfully');
-    
+
+    // Graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        pool.end(() => {
+          logger.info('Server and database connections closed');
+          process.exit(0);
+        });
+      });
+    });
+
+    process.on('SIGINT', async () => {
+      logger.info('SIGINT received, shutting down gracefully');
+      server.close(() => {
+        pool.end(() => {
+          logger.info('Server and database connections closed');
+          process.exit(0);
+        });
+      });
+    });
+
   } catch (error) {
-    logger.error('Failed to start auth service', { error });
+    logger.error('Failed to start server', { error });
     process.exit(1);
   }
-};
+}
 
-// Start the server
 startServer();

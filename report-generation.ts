@@ -1,0 +1,16 @@
+import {
+  PerformanceReport,
+  CategoryScore,
+  DetailedAnalysis,
+  ImprovementRecommendation,
+  ReportMetadata,
+  GenerateReportRequest,
+  ReportGenerationOptions,
+  ReportSummary,
+  AnalysisCategory,
+  ReportType,
+  TextAnalysisResult,
+  SpeechAnalysisResult,
+  EmotionAnalysisResult,
+  BehaviorAnalysisResult,
+  TechnicalAnaly

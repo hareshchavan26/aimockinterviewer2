@@ -1,176 +1,152 @@
 import express from 'express';
+import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { Pool } from 'pg';
 import { config } from './config';
-import { db, redis } from './database/connection';
-import { PostgresAuthRepository } from './database/repository';
-import { PostgresUserProfileRepository } from './database/user-profile-repository';
-import { JWTTokenService } from './services/token';
-import { BcryptPasswordService } from './services/password';
-import { NodemailerEmailService } from './services/email';
-import { LocalFileStorageService } from './services/file-storage';
-import { AuthService } from './services/auth';
-import { DefaultUserProfileService } from './services/user-profile';
-import { createAuthRoutes, errorHandler } from './routes/auth';
-import { createUserProfileRoutes } from './routes/user-profile';
-import { 
-  createAuthMiddleware,
-  createOptionalAuthMiddleware,
-  createRateLimitMiddleware,
-  corsMiddleware,
-  securityHeadersMiddleware,
-  validateContentType
-} from './middleware/auth';
 import { logger } from './utils/logger';
+import { SubscriptionController } from './controllers/subscription';
+import { WebhookController } from './controllers/webhook';
+import { UpgradePromptController } from './controllers/upgrade-prompt';
+import { InterviewDemoController } from './controllers/interview-demo';
+import { DefaultSubscriptionService } from './services/subscription';
+import { StripePaymentService } from './services/payment';
+import { UsageEnforcementService } from './services/usage-enforcement';
+import { DatabaseSubscriptionRepository } from './database/subscription-repository';
+import { createFeatureAccessMiddleware } from './middleware/feature-access';
 
-export const createApp = async () => {
+export function createApp(pool: Pool) {
   const app = express();
 
-  // Trust proxy for accurate IP addresses
-  app.set('trust proxy', 1);
-
   // Security middleware
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
-      },
-    },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
+  app.use(helmet());
+  app.use(cors({
+    origin: config.cors.allowedOrigins,
+    credentials: true,
   }));
 
-  // CORS middleware
-  app.use(corsMiddleware);
-
-  // Security headers
-  app.use(securityHeadersMiddleware);
-
-  // Body parsing middleware
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-  // Content type validation
-  app.use(validateContentType);
-
   // Rate limiting
-  app.use(createRateLimitMiddleware(15 * 60 * 1000, 100)); // 100 requests per 15 minutes
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+  });
+  app.use('/api/', limiter);
+
+  // Webhook endpoint needs raw body
+  app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+  
+  // JSON parsing for other endpoints
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
 
   // Initialize services
-  const repository = new PostgresAuthRepository();
-  const userProfileRepository = new PostgresUserProfileRepository();
-  const tokenService = new JWTTokenService();
-  const passwordService = new BcryptPasswordService();
-  const emailService = new NodemailerEmailService();
-  const fileStorageService = new LocalFileStorageService();
-  const authService = new AuthService(repository, emailService, tokenService, passwordService);
-  const userProfileService = new DefaultUserProfileService(userProfileRepository, fileStorageService);
+  const repository = new DatabaseSubscriptionRepository(pool);
+  const paymentService = new StripePaymentService(
+    repository,
+    config.stripe.secretKey,
+    config.stripe.webhookSecret
+  );
+  const subscriptionService = new DefaultSubscriptionService(repository);
+  const usageEnforcementService = new UsageEnforcementService(subscriptionService);
 
-  // Create middleware
-  const authMiddleware = createAuthMiddleware(tokenService);
-  const optionalAuthMiddleware = createOptionalAuthMiddleware(tokenService);
+  // Initialize middleware
+  const featureAccessMiddleware = createFeatureAccessMiddleware(subscriptionService);
 
-  // Health check endpoint
+  // Initialize controllers
+  const subscriptionController = new SubscriptionController(subscriptionService, paymentService);
+  const webhookController = new WebhookController(paymentService);
+  const upgradePromptController = new UpgradePromptController(subscriptionService, usageEnforcementService);
+  const interviewDemoController = new InterviewDemoController(subscriptionService, usageEnforcementService);
+
+  // Make services available to middleware
+  app.locals.subscriptionService = subscriptionService;
+  app.locals.usageEnforcementService = usageEnforcementService;
+
+  // Mock authentication middleware (in real app, this would validate JWT tokens)
+  app.use('/api', (req: any, res, next) => {
+    // Mock user ID - in real app, extract from JWT token
+    req.userId = req.headers['x-user-id'] || req.body.userId || req.query.userId;
+    next();
+  });
+
+  // Add subscription context to all API requests
+  app.use('/api', featureAccessMiddleware.addSubscriptionContext());
+
+  // Health check
   app.get('/health', (req, res) => {
-    res.json({
-      success: true,
-      message: 'Auth service is healthy',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-    });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // API routes
-  app.use('/api/auth', createAuthRoutes(authService));
-  app.use('/api/user', createUserProfileRoutes(userProfileService));
+  // Webhook routes (must be before other middleware)
+  app.post('/api/webhooks/stripe', (req, res) => webhookController.handleStripeWebhook(req, res));
 
-  // Protected routes example
-  app.get('/api/protected', authMiddleware, (req, res) => {
-    res.json({
-      success: true,
-      message: 'This is a protected route',
-      user: {
-        id: req.userId,
-        email: req.userEmail,
-      },
-    });
+  // Subscription routes
+  app.post('/api/subscriptions', (req, res) => subscriptionController.createSubscription(req, res));
+  app.get('/api/subscriptions/:subscriptionId', (req, res) => subscriptionController.getSubscription(req, res));
+  app.put('/api/subscriptions/:subscriptionId', (req, res) => subscriptionController.updateSubscription(req, res));
+  app.delete('/api/subscriptions/:subscriptionId', (req, res) => subscriptionController.cancelSubscription(req, res));
+  
+  // User subscription routes
+  app.get('/api/users/:userId/subscription', (req, res) => subscriptionController.getUserSubscription(req, res));
+  
+  // Usage tracking routes
+  app.post('/api/usage/track', (req, res) => subscriptionController.trackUsage(req, res));
+  app.get('/api/subscriptions/:subscriptionId/usage', (req, res) => subscriptionController.getCurrentUsage(req, res));
+  app.get('/api/subscriptions/:subscriptionId/usage/check', (req, res) => subscriptionController.checkUsageLimit(req, res));
+  
+  // Usage enforcement routes
+  app.get('/api/subscriptions/:subscriptionId/usage/summary', async (req, res) => {
+    try {
+      const summary = await usageEnforcementService.getUsageSummary(req.params.subscriptionId);
+      res.json(summary);
+    } catch (error) {
+      logger.error('Failed to get usage summary', { error });
+      res.status(500).json({ error: 'Failed to get usage summary' });
+    }
   });
 
-  // Optional auth route example
-  app.get('/api/optional-auth', optionalAuthMiddleware, (req, res) => {
-    res.json({
-      success: true,
-      message: 'This route works with or without authentication',
-      user: req.userId ? {
-        id: req.userId,
-        email: req.userEmail,
-      } : null,
+  app.get('/api/subscriptions/:subscriptionId/usage/warnings', async (req, res) => {
+    try {
+      const warnings = await usageEnforcementService.getUsageWarnings(req.params.subscriptionId);
+      res.json({ warnings });
+    } catch (error) {
+      logger.error('Failed to get usage warnings', { error });
+      res.status(500).json({ error: 'Failed to get usage warnings' });
+    }
+  });
+
+  // Upgrade prompt routes
+  app.get('/api/users/:userId/upgrade/recommendation', (req, res) => upgradePromptController.getUpgradeRecommendation(req, res));
+  app.get('/api/users/:userId/upgrade/should-show', (req, res) => upgradePromptController.shouldShowUpgradePrompt(req, res));
+  app.get('/api/subscriptions/:subscriptionId/upgrade/suggestions', (req, res) => upgradePromptController.getUsageBasedSuggestions(req, res));
+  app.get('/api/users/:userId/upgrade/plan-comparison', (req, res) => upgradePromptController.getPlanComparison(req, res));
+  app.post('/api/upgrade/track-interaction', (req, res) => upgradePromptController.trackUpgradePromptInteraction(req, res));
+  
+  // Payment retry routes
+  app.post('/api/subscriptions/:subscriptionId/retry-payment', (req, res) => subscriptionController.retryFailedPayment(req, res));
+
+  // Demo interview routes (showing integration with usage limits and feature gating)
+  app.get('/api/interviews/can-start', (req, res) => interviewDemoController.canStartInterview(req, res));
+  app.post('/api/interviews/start', (req, res) => interviewDemoController.startInterview(req, res));
+  app.get('/api/analytics/advanced', (req, res) => interviewDemoController.getAdvancedAnalytics(req, res));
+
+  // Error handling middleware
+  app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.error('Unhandled error', { error, url: req.url, method: req.method });
+    res.status(500).json({
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR',
     });
   });
 
   // 404 handler
   app.use('*', (req, res) => {
     res.status(404).json({
-      success: false,
-      error: {
-        code: 'NOT_FOUND',
-        message: 'Endpoint not found',
-      },
+      error: 'Not found',
+      code: 'NOT_FOUND',
     });
   });
-
-  // Error handling middleware (must be last)
-  app.use(errorHandler);
 
   return app;
-};
-
-// Graceful shutdown handler
-export const setupGracefulShutdown = (server: any) => {
-  const shutdown = async (signal: string) => {
-    logger.info(`Received ${signal}, shutting down gracefully`);
-    
-    server.close(async () => {
-      logger.info('HTTP server closed');
-      
-      try {
-        await db.close();
-        logger.info('Database connection closed');
-        
-        await redis.close();
-        logger.info('Redis connection closed');
-        
-        process.exit(0);
-      } catch (error) {
-        logger.error('Error during shutdown', { error });
-        process.exit(1);
-      }
-    });
-    
-    // Force close after 30 seconds
-    setTimeout(() => {
-      logger.error('Could not close connections in time, forcefully shutting down');
-      process.exit(1);
-    }, 30000);
-  };
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  
-  // Handle uncaught exceptions
-  process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception', { error });
-    process.exit(1);
-  });
-  
-  // Handle unhandled promise rejections
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection', { reason, promise });
-    process.exit(1);
-  });
-};
+}

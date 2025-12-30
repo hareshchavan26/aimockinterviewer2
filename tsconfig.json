@@ -1,15 +1,9 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "declaration": false,
-    "emitDeclarationOnly": false,
-    "noEmit": false,
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
