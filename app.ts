@@ -1,124 +1,183 @@
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { Pool } from 'pg';
+import cors from 'cors';
 import { config } from './config';
+import { initializeConnections } from './database/connection';
+import { PostgresReportRepository } from './database/repository';
+import { DefaultReportGeneratorService } from './services/report-generator';
+import { createReportRoutes } from './routes/reports';
+import improvementRoutes from './routes/improvement';
+import progressRoutes from './routes/progress';
+import engagementRoutes from './routes/engagement';
+import exportRoutes from './routes/export';
+import securityRoutes from './routes/security';
+import privacyRoutes from './routes/privacy';
+import { auditLogger, rateLimiter, inputSanitizer } from './middleware/security-middleware';
+import { schedulerService } from './services/scheduler-service';
 import { logger } from './utils/logger';
-import { InterviewConfigController } from './controllers/interview-config-controller';
-import { SessionController } from './controllers/session-controller';
-import { DefaultInterviewConfigService } from './services/interview-config-service';
-import { DatabaseInterviewConfigRepository } from './repositories/interview-config-repository';
-import aiInterviewerRoutes from './routes/ai-interviewer-routes';
-import { textAnalysisRoutes } from './routes/text-analysis-routes';
-import { speechAnalysisRoutes } from './routes/speech-analysis-routes';
-import { emotionFacialAnalysisRoutes } from './routes/emotion-facial-analysis-routes';
-import realTimeAnalysisRoutes from './routes/real-time-analysis-routes';
 
-export function createApp(pool: Pool) {
+export const createApp = async () => {
   const app = express();
 
+  // Trust proxy for accurate IP addresses
+  app.set('trust proxy', 1);
+
   // Security middleware
-  app.use(helmet());
-  app.use(cors({
-    origin: config.cors.allowedOrigins,
-    credentials: true,
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
   }));
 
-  // Rate limiting
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.',
-  });
-  app.use('/api/', limiter);
+  // CORS middleware
+  app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
 
-  // JSON parsing
+  // Body parsing middleware
   app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Initialize services
-  const repository = new DatabaseInterviewConfigRepository(pool);
-  const configService = new DefaultInterviewConfigService(repository);
+  // Security middleware
+  app.use(auditLogger({
+    enableAuditLogging: true,
+    excludePaths: ['/health', '/metrics'],
+  }));
+  app.use(inputSanitizer({
+    sensitiveFields: ['password', 'token', 'ssn', 'creditCard'],
+  }));
+  app.use(rateLimiter(100, 15 * 60 * 1000)); // 100 requests per 15 minutes
 
-  // Initialize controllers
-  const configController = new InterviewConfigController(configService);
-  const sessionController = new SessionController(configService);
-
-  // Mock authentication middleware (in real app, this would validate JWT tokens)
-  app.use('/api', (req: any, res, next) => {
-    // Mock user ID - in real app, extract from JWT token
-    req.userId = req.headers['x-user-id'] || req.body.userId || req.query.userId;
+  // Request logging middleware
+  app.use((req, res, next) => {
+    logger.info('Incoming request', {
+      method: req.method,
+      url: req.url,
+      userAgent: req.get('User-Agent'),
+      ip: req.ip,
+    });
     next();
   });
 
-  // Health check
+  // Initialize services
+  const reportRepository = new PostgresReportRepository();
+  const reportGenerator = new DefaultReportGeneratorService();
+
+  // Start scheduler service
+  schedulerService.startScheduler();
+
+  // Health check endpoint
   app.get('/health', (req, res) => {
-    res.json({ 
-      status: 'ok', 
+    res.json({
+      success: true,
+      message: 'Reporting service is healthy',
       timestamp: new Date().toISOString(),
-      service: 'interview-service',
+      version: '1.0.0',
+      service: 'reporting',
     });
   });
 
-  // Configuration routes
-  app.post('/api/configs', (req, res) => configController.createConfiguration(req, res));
-  app.get('/api/configs/:configId', (req, res) => configController.getConfiguration(req, res));
-  app.get('/api/users/:userId/configs', (req, res) => configController.getUserConfigurations(req, res));
-  app.put('/api/configs/:configId', (req, res) => configController.updateConfiguration(req, res));
-  app.delete('/api/configs/:configId', (req, res) => configController.deleteConfiguration(req, res));
-  app.post('/api/configs/validate', (req, res) => configController.validateConfiguration(req, res));
-
-  // Template routes
-  app.get('/api/templates/:templateId', (req, res) => configController.getTemplate(req, res));
-  app.get('/api/templates', (req, res) => configController.searchTemplates(req, res));
-  app.get('/api/templates/role/:role', (req, res) => configController.getTemplatesByRole(req, res));
-  app.get('/api/templates/industry/:industry', (req, res) => configController.getTemplatesByIndustry(req, res));
-
-  // Session routes
-  app.post('/api/sessions', (req, res) => sessionController.createSession(req, res));
-  app.get('/api/sessions/:sessionId', (req, res) => sessionController.getSession(req, res));
-  app.get('/api/users/:userId/sessions', (req, res) => sessionController.getUserSessions(req, res));
-  app.post('/api/sessions/:sessionId/control', (req, res) => sessionController.controlSession(req, res));
-  app.get('/api/sessions/:sessionId/status', (req, res) => sessionController.getSessionStatus(req, res));
-  app.get('/api/sessions/:sessionId/current-question', (req, res) => sessionController.getCurrentQuestion(req, res));
-  app.get('/api/sessions/:sessionId/time-limits', (req, res) => sessionController.checkTimeLimits(req, res));
-
-  // Response routes
-  app.post('/api/sessions/:sessionId/responses', (req, res) => sessionController.submitResponse(req, res));
-  app.get('/api/sessions/:sessionId/responses', (req, res) => sessionController.getSessionResponses(req, res));
-
-  // AI Interviewer routes
-  app.use('/api/ai-interviewer', aiInterviewerRoutes);
-
-  // Text Analysis routes
-  app.use('/api/text-analysis', textAnalysisRoutes);
-
-  // Speech Analysis routes
-  app.use('/api/speech-analysis', speechAnalysisRoutes);
-
-  // Emotion and Facial Analysis routes
-  app.use('/api/emotion-facial-analysis', emotionFacialAnalysisRoutes);
-
-  // Real-Time Analysis routes
-  app.use('/api/real-time-analysis', realTimeAnalysisRoutes);
-
-  // Error handling middleware
-  app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    logger.error('Unhandled error', { error, url: req.url, method: req.method });
-    res.status(500).json({
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR',
-    });
-  });
+  // API routes
+  app.use('/api/reports', createReportRoutes(reportGenerator, reportRepository));
+  app.use('/api/reporting/improvement', improvementRoutes);
+  app.use('/api/reporting/progress', progressRoutes);
+  app.use('/api/reporting/engagement', engagementRoutes);
+  app.use('/api/reporting/export', exportRoutes);
+  app.use('/api/reporting/security', securityRoutes);
+  app.use('/api/reporting/privacy', privacyRoutes);
 
   // 404 handler
   app.use('*', (req, res) => {
     res.status(404).json({
-      error: 'Not found',
-      code: 'NOT_FOUND',
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Endpoint not found',
+      },
+    });
+  });
+
+  // Error handling middleware (must be last)
+  app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    logger.error('Unhandled error', {
+      error: error.message,
+      stack: error.stack,
+      url: req.url,
+      method: req.method,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: config.nodeEnv === 'development' ? error.message : 'Internal server error',
+      },
     });
   });
 
   return app;
-}
+};
+
+// Graceful shutdown handler
+export const setupGracefulShutdown = (server: any) => {
+  const shutdown = async (signal: string) => {
+    logger.info(`Received ${signal}, shutting down gracefully`);
+    
+    // Stop scheduler service
+    schedulerService.stopScheduler();
+    
+    server.close(async () => {
+      logger.info('HTTP server closed');
+      
+      try {
+        // Close database connections
+        const { db, redis } = await import('./database/connection');
+        
+        await db.end();
+        logger.info('Database connection closed');
+        
+        await redis.quit();
+        logger.info('Redis connection closed');
+        
+        process.exit(0);
+      } catch (error) {
+        logger.error('Error during shutdown', { error });
+        process.exit(1);
+      }
+    });
+    
+    // Force close after 30 seconds
+    setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 30000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception', { error });
+    process.exit(1);
+  });
+  
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection', { reason, promise });
+    process.exit(1);
+  });
+};

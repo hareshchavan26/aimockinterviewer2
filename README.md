@@ -1,338 +1,176 @@
-# [SuperTest](https://ladjs.github.io/superagent/)
+# Reporting Service
 
-[![code coverage][coverage-badge]][coverage]
-[![Build Status][travis-badge]][travis]
-[![Dependencies][dependencies-badge]][dependencies]
-[![PRs Welcome][prs-badge]][prs]
-[![MIT License][license-badge]][license]
+The Reporting Service is responsible for generating comprehensive performance reports for interview sessions in the AI Mock Interview Platform. It analyzes interview data and provides detailed feedback, improvement recommendations, and progress tracking.
 
-> HTTP assertions made easy via [superagent](http://github.com/ladjs/superagent).  Maintained for [Forward Email](https://github.com/forwardemail) and [Lad](https://github.com/ladjs).
+## Features
 
-## About
+- **Performance Report Generation**: Creates detailed reports with scoring across multiple categories
+- **Category Scoring**: Evaluates communication, technical accuracy, confidence, clarity, structure, and relevance
+- **Improvement Plans**: Generates personalized recommendations and practice exercises
+- **Benchmark Comparisons**: Compares performance against industry and role averages
+- **Annotated Transcripts**: Creates color-coded transcripts with highlights and insights
+- **Progress Tracking**: Tracks improvement over multiple sessions
+- **Data Export**: Supports PDF, JSON, and CSV export formats
 
-The motivation with this module is to provide a high-level abstraction for testing
-HTTP, while still allowing you to drop down to the [lower-level API](https://ladjs.github.io/superagent/) provided by superagent.
+## API Endpoints
 
-## Getting Started
+### Health Check
+- `GET /health` - Service health status
 
-Install SuperTest as an npm module and save it to your package.json file as a development dependency:
+### Reports
+- `POST /api/reports/generate` - Generate a new performance report
+- `GET /api/reports/:reportId` - Get a specific report by ID
+- `GET /api/reports/user/:userId` - Get all reports for a user
+- `GET /api/reports/session/:sessionId` - Get report for a specific session
+- `DELETE /api/reports/:reportId` - Delete a report
 
+## Environment Variables
+
+```env
+# Service Configuration
+NODE_ENV=development
+REPORTING_PORT=3005
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=ai_interview_platform
+DB_USER=postgres
+DB_PASSWORD=password
+DB_SSL=false
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# Service URLs
+AUTH_SERVICE_URL=http://localhost:3001
+INTERVIEW_SERVICE_URL=http://localhost:3003
+ANALYSIS_SERVICE_URL=http://localhost:3006
+
+# Report Configuration
+REPORT_CACHE_EXPIRATION=60
+MAX_REPORTS_PER_USER=100
+REPORT_RETENTION_DAYS=90
+
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=json
+```
+
+## Database Schema
+
+The service uses the following PostgreSQL tables:
+
+- `performance_reports` - Main report records
+- `report_category_scores` - Category-wise scoring data
+- `report_improvement_plans` - Improvement recommendations and exercises
+- `report_benchmark_comparisons` - Performance benchmarking data
+- `report_transcripts` - Annotated transcript data
+
+## Development
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 15+
+- Redis 7+
+
+### Setup
 ```bash
-npm install supertest --save-dev
+# Install dependencies
+npm install
+
+# Run database migrations
+npm run migrate
+
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
 ```
 
-  Once installed it can now be referenced by simply calling ```require('supertest');```
+### Docker
+```bash
+# Build image
+docker build -t ai-interview-reporting .
 
-## Example
-
-You may pass an `http.Server`, or a `Function` to `request()` - if the server is not
-already listening for connections then it is bound to an ephemeral port for you so
-there is no need to keep track of ports.
-
-SuperTest works with any test framework, here is an example without using any
-test framework at all:
-
-```js
-const request = require('supertest');
-const express = require('express');
-
-const app = express();
-
-app.get('/user', function(req, res) {
-  res.status(200).json({ name: 'john' });
-});
-
-request(app)
-  .get('/user')
-  .expect('Content-Type', /json/)
-  .expect('Content-Length', '15')
-  .expect(200)
-  .end(function(err, res) {
-    if (err) throw err;
-  });
+# Run container
+docker run -p 3005:3005 ai-interview-reporting
 ```
 
-To enable http2 protocol, simply append an options to `request` or `request.agent`:
+## Report Generation Process
 
-```js
-const request = require('supertest');
-const express = require('express');
+1. **Data Collection**: Fetches interview session data and analysis results
+2. **Score Calculation**: Computes category scores from individual response analyses
+3. **Improvement Analysis**: Identifies priority areas and generates recommendations
+4. **Benchmark Comparison**: Compares performance against industry standards
+5. **Transcript Generation**: Creates annotated transcript with highlights
+6. **Report Assembly**: Combines all components into a comprehensive report
+7. **Storage**: Persists report to database with proper indexing
 
-const app = express();
+## Performance Scoring
 
-app.get('/user', function(req, res) {
-  res.status(200).json({ name: 'john' });
-});
+Reports include scoring across six key categories:
 
-request(app, { http2: true })
-  .get('/user')
-  .expect('Content-Type', /json/)
-  .expect('Content-Length', '15')
-  .expect(200)
-  .end(function(err, res) {
-    if (err) throw err;
-  });
+- **Communication** (0-1): Based on speech clarity and delivery
+- **Technical Accuracy** (0-1): Evaluates correctness of technical responses
+- **Confidence** (0-1): Measures confidence levels from voice and behavior
+- **Clarity** (0-1): Assesses clarity of verbal and written responses
+- **Structure** (0-1): Evaluates response organization and flow
+- **Relevance** (0-1): Measures relevance to questions and role requirements
 
-request.agent(app, { http2: true })
-  .get('/user')
-  .expect('Content-Type', /json/)
-  .expect('Content-Length', '15')
-  .expect(200)
-  .end(function(err, res) {
-    if (err) throw err;
-  });
+## Improvement Recommendations
+
+The service generates personalized improvement plans including:
+
+- **Priority Areas**: Categories scoring below 0.7 threshold
+- **Action Items**: Specific steps to improve performance
+- **Practice Exercises**: Targeted exercises for skill development
+- **Resources**: Links to helpful articles, courses, and materials
+- **Time Estimates**: Realistic timelines for improvement
+
+## Testing
+
+The service includes comprehensive test coverage:
+
+- **Unit Tests**: Test individual components and business logic
+- **Integration Tests**: Test API endpoints and service integration
+- **Property-Based Tests**: Validate correctness properties using fast-check
+
+Run tests with:
+```bash
+npm test
+npm run test:watch
 ```
 
-Here's an example with mocha, note how you can pass `done` straight to any of the `.expect()` calls:
+## Monitoring and Logging
 
-```js
-describe('GET /user', function() {
-  it('responds with json', function(done) {
-    request(app)
-      .get('/user')
-      .set('Accept', 'application/json')
-      .expect('Content-Type', /json/)
-      .expect(200, done);
-  });
-});
-```
+The service includes:
 
-You can use `auth` method to pass HTTP username and password in the same way as in the [superagent](http://ladjs.github.io/superagent/#authentication):
+- **Structured Logging**: JSON-formatted logs with Winston
+- **Health Checks**: Built-in health monitoring endpoints
+- **Error Tracking**: Comprehensive error handling and reporting
+- **Performance Metrics**: Request timing and database query monitoring
 
-```js
-describe('GET /user', function() {
-  it('responds with json', function(done) {
-    request(app)
-      .get('/user')
-      .auth('username', 'password')
-      .set('Accept', 'application/json')
-      .expect('Content-Type', /json/)
-      .expect(200, done);
-  });
-});
-```
+## Security
 
-One thing to note with the above statement is that superagent now sends any HTTP
-error (anything other than a 2XX response code) to the callback as the first argument if
-you do not add a status code expect (i.e. `.expect(302)`).
+- **Input Validation**: All API inputs validated with express-validator
+- **SQL Injection Protection**: Parameterized queries with pg
+- **Rate Limiting**: Built-in rate limiting for API endpoints
+- **CORS Configuration**: Configurable cross-origin resource sharing
+- **Security Headers**: Helmet.js for security headers
 
-If you are using the `.end()` method `.expect()` assertions that fail will
-not throw - they will return the assertion as an error to the `.end()` callback. In
-order to fail the test case, you will need to rethrow or pass `err` to `done()`, as follows:
+## Deployment
 
-```js
-describe('POST /users', function() {
-  it('responds with json', function(done) {
-    request(app)
-      .post('/users')
-      .send({name: 'john'})
-      .set('Accept', 'application/json')
-      .expect('Content-Type', /json/)
-      .expect(200)
-      .end(function(err, res) {
-        if (err) return done(err);
-        return done();
-      });
-  });
-});
-```
+The service is designed for containerized deployment:
 
-You can also use promises:
-
-```js
-describe('GET /users', function() {
-  it('responds with json', function() {
-    return request(app)
-      .get('/users')
-      .set('Accept', 'application/json')
-      .expect('Content-Type', /json/)
-      .expect(200)
-      .then(response => {
-         expect(response.body.email).toEqual('foo@bar.com');
-      })
-  });
-});
-```
-
-Or async/await syntax:
-
-```js
-describe('GET /users', function() {
-  it('responds with json', async function() {
-    const response = await request(app)
-      .get('/users')
-      .set('Accept', 'application/json')
-    expect(response.headers["Content-Type"]).toMatch(/json/);
-    expect(response.status).toEqual(200);
-    expect(response.body.email).toEqual('foo@bar.com');
-  });
-});
-```
-
-Expectations are run in the order of definition. This characteristic can be used
-to modify the response body or headers before executing an assertion.
-
-```js
-describe('POST /user', function() {
-  it('user.name should be an case-insensitive match for "john"', function(done) {
-    request(app)
-      .post('/user')
-      .send('name=john') // x-www-form-urlencoded upload
-      .set('Accept', 'application/json')
-      .expect(function(res) {
-        res.body.id = 'some fixed id';
-        res.body.name = res.body.name.toLowerCase();
-      })
-      .expect(200, {
-        id: 'some fixed id',
-        name: 'john'
-      }, done);
-  });
-});
-```
-
-Anything you can do with superagent, you can do with supertest - for example multipart file uploads!
-
-```js
-request(app)
-  .post('/')
-  .field('name', 'my awesome avatar')
-  .field('complex_object', '{"attribute": "value"}', {contentType: 'application/json'})
-  .attach('avatar', 'test/fixtures/avatar.jpg')
-  ...
-```
-
-Passing the app or url each time is not necessary, if you're testing
-the same host you may simply re-assign the request variable with the
-initialization app or url, a new `Test` is created per `request.VERB()` call.
-
-```js
-request = request('http://localhost:5555');
-
-request.get('/').expect(200, function(err){
-  console.log(err);
-});
-
-request.get('/').expect('heya', function(err){
-  console.log(err);
-});
-```
-
-Here's an example with mocha that shows how to persist a request and its cookies:
-
-```js
-const request = require('supertest');
-const should = require('should');
-const express = require('express');
-const cookieParser = require('cookie-parser');
-
-describe('request.agent(app)', function() {
-  const app = express();
-  app.use(cookieParser());
-
-  app.get('/', function(req, res) {
-    res.cookie('cookie', 'hey');
-    res.send();
-  });
-
-  app.get('/return', function(req, res) {
-    if (req.cookies.cookie) res.send(req.cookies.cookie);
-    else res.send(':(')
-  });
-
-  const agent = request.agent(app);
-
-  it('should save cookies', function(done) {
-    agent
-    .get('/')
-    .expect('set-cookie', 'cookie=hey; Path=/', done);
-  });
-
-  it('should send cookies', function(done) {
-    agent
-    .get('/return')
-    .expect('hey', done);
-  });
-});
-```
-
-There is another example that is introduced by the file [agency.js](https://github.com/ladjs/superagent/blob/master/test/node/agency.js)
-
-Here is an example where 2 cookies are set on the request.
-
-```js
-agent(app)
-  .get('/api/content')
-  .set('Cookie', ['nameOne=valueOne;nameTwo=valueTwo'])
-  .send()
-  .expect(200)
-  .end((err, res) => {
-    if (err) {
-      return done(err);
-    }
-    expect(res.text).to.be.equal('hey');
-    return done();
-  });
-```
-
-## API
-
-You may use any [superagent](http://github.com/ladjs/superagent) methods,
-including `.write()`, `.pipe()` etc and perform assertions in the `.end()` callback
-for lower-level needs.
-
-### .expect(status[, fn])
-
-Assert response `status` code.
-
-### .expect(status, body[, fn])
-
-Assert response `status` code and `body`.
-
-### .expect(body[, fn])
-
-Assert response `body` text with a string, regular expression, or
-parsed body object.
-
-### .expect(field, value[, fn])
-
-Assert header `field` `value` with a string or regular expression.
-
-### .expect(function(res) {})
-
-Pass a custom assertion function. It'll be given the response object to check. If the check fails, throw an error.
-
-```js
-request(app)
-  .get('/')
-  .expect(hasPreviousAndNextKeys)
-  .end(done);
-
-function hasPreviousAndNextKeys(res) {
-  if (!('next' in res.body)) throw new Error("missing next key");
-  if (!('prev' in res.body)) throw new Error("missing prev key");
-}
-```
-
-### .end(fn)
-
-Perform the request and invoke `fn(err, res)`.
-
-## Notes
-
-Inspired by [api-easy](https://github.com/flatiron/api-easy) minus vows coupling.
-
-## License
-
-MIT
-
-[coverage-badge]: https://img.shields.io/codecov/c/github/ladjs/supertest.svg
-[coverage]: https://codecov.io/gh/ladjs/supertest
-[travis-badge]: https://travis-ci.org/ladjs/supertest.svg?branch=master
-[travis]: https://travis-ci.org/ladjs/supertest
-[dependencies-badge]: https://david-dm.org/ladjs/supertest/status.svg
-[dependencies]: https://david-dm.org/ladjs/supertest
-[prs-badge]: https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square
-[prs]: http://makeapullrequest.com
-[license-badge]: https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square
-[license]: https://github.com/ladjs/supertest/blob/master/LICENSE
+- **Docker Support**: Multi-stage Dockerfile for optimized images
+- **Health Checks**: Built-in Docker health check commands
+- **Graceful Shutdown**: Proper cleanup of database connections
+- **Environment Configuration**: 12-factor app configuration principles

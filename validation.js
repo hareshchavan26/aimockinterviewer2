@@ -1,52 +1,50 @@
 import { z } from 'zod';
-import { ValidationError } from '../types';
-// Validation schemas
-export const registerSchema = z.object({
+// User validation schemas
+export const userRegistrationSchema = z.object({
     email: z.string().email('Invalid email format'),
     password: z
         .string()
         .min(8, 'Password must be at least 8 characters')
         .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 'Password must contain uppercase, lowercase, number, and special character'),
-    firstName: z.string().min(1, 'First name is required').max(50, 'First name too long'),
-    lastName: z.string().min(1, 'Last name is required').max(50, 'Last name too long'),
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
 });
-export const loginSchema = z.object({
+export const userLoginSchema = z.object({
     email: z.string().email('Invalid email format'),
     password: z.string().min(1, 'Password is required'),
 });
-export const forgotPasswordSchema = z.object({
-    email: z.string().email('Invalid email format'),
-});
-export const resetPasswordSchema = z.object({
+export const passwordResetSchema = z.object({
     token: z.string().min(1, 'Reset token is required'),
     newPassword: z
         .string()
         .min(8, 'Password must be at least 8 characters')
         .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 'Password must contain uppercase, lowercase, number, and special character'),
 });
-export const magicLinkSchema = z.object({
-    email: z.string().email('Invalid email format'),
+// Interview configuration validation
+export const interviewConfigSchema = z.object({
+    industry: z.string().min(1, 'Industry is required'),
+    role: z.string().min(1, 'Role is required'),
+    company: z.string().min(1, 'Company is required'),
+    difficulty: z.enum(['easy', 'medium', 'hard']),
+    questionTypes: z.array(z.string()).min(1, 'At least one question type is required'),
+    timeLimit: z.number().min(5).max(180, 'Time limit must be between 5 and 180 minutes'),
+    interviewerPersonality: z.enum(['friendly', 'neutral', 'stress']),
 });
-export const refreshTokenSchema = z.object({
-    refreshToken: z.string().min(1, 'Refresh token is required'),
+// User response validation
+export const userResponseSchema = z.object({
+    questionId: z.string().uuid('Invalid question ID'),
+    textResponse: z.string().optional(),
+    audioUrl: z.string().url().optional(),
+    videoUrl: z.string().url().optional(),
+    timestamp: z.date(),
+    duration: z.number().min(0),
 });
-export const verifyEmailSchema = z.object({
-    token: z.string().min(1, 'Verification token is required'),
+// Subscription validation
+export const subscriptionSchema = z.object({
+    planId: z.string().min(1, 'Plan ID is required'),
+    paymentMethodId: z.string().optional(),
 });
-// Validation helper functions
-export const validateRequest = (schema, data) => {
-    try {
-        return schema.parse(data);
-    }
-    catch (error) {
-        if (error instanceof z.ZodError) {
-            const firstError = error.errors[0];
-            throw new ValidationError(firstError.message, firstError.path.join('.'));
-        }
-        throw error;
-    }
-};
-// Individual field validators
+// Common validation utilities
 export const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -59,83 +57,25 @@ export const validateUUID = (uuid) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
 };
-export const validateName = (name) => {
-    return name.length >= 1 && name.length <= 50 && /^[a-zA-Z\s'-]+$/.test(name);
-};
-// Sanitization functions
+// Sanitization utilities
 export const sanitizeString = (input) => {
     return input.trim().replace(/[<>]/g, '');
 };
 export const sanitizeEmail = (email) => {
     return email.toLowerCase().trim();
 };
-export const sanitizeName = (name) => {
-    return name.trim().replace(/\s+/g, ' ');
-};
-// Rate limiting validation
-export const validateRateLimit = (attempts, maxAttempts, windowMs, lastAttempt) => {
-    if (!lastAttempt) {
-        return attempts < maxAttempts;
-    }
-    const now = new Date();
-    const timeDiff = now.getTime() - lastAttempt.getTime();
-    if (timeDiff > windowMs) {
-        // Window has expired, reset attempts
-        return true;
-    }
-    return attempts < maxAttempts;
-};
-// Token validation
-export const validateToken = (token) => {
-    return token.length >= 32 && /^[a-zA-Z0-9]+$/.test(token);
-};
-// IP address validation
-export const validateIPAddress = (ip) => {
-    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-    return ipv4Regex.test(ip) || ipv6Regex.test(ip);
-};
-// User agent validation
-export const validateUserAgent = (userAgent) => {
-    return userAgent.length > 0 && userAgent.length <= 500;
-};
-// Custom validation error class
-export class ValidationErrorWithDetails extends ValidationError {
-    errors;
-    constructor(message, errors) {
+// Validation error handling
+export class ValidationError extends Error {
+    field;
+    code;
+    constructor(message, field, code) {
         super(message);
-        this.errors = errors;
-        this.name = 'ValidationErrorWithDetails';
+        this.field = field;
+        this.code = code;
+        this.name = 'ValidationError';
     }
 }
-// Batch validation helper
-export const validateMultipleFields = (validations) => {
-    const errors = [];
-    validations.forEach(({ field, value, validator, message }) => {
-        if (!validator(value)) {
-            errors.push({ field, message });
-        }
-    });
-    if (errors.length > 0) {
-        throw new ValidationErrorWithDetails('Validation failed', errors);
-    }
-};
-// Password strength validation
-export const getPasswordStrengthScore = (password) => {
-    let score = 0;
-    // Length
-    if (password.length >= 8)
-        score += 25;
-    if (password.length >= 12)
-        score += 25;
-    // Character variety
-    if (/[a-z]/.test(password))
-        score += 12.5;
-    if (/[A-Z]/.test(password))
-        score += 12.5;
-    if (/\d/.test(password))
-        score += 12.5;
-    if (/[@$!%*?&]/.test(password))
-        score += 12.5;
-    return Math.min(100, score);
+export const handleValidationError = (error) => {
+    const firstError = error.errors[0];
+    return new ValidationError(firstError.message, firstError.path.join('.'), firstError.code);
 };

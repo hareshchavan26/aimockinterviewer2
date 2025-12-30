@@ -1,41 +1,39 @@
-/**
- * Logger utility for real-time service
- */
-
 import winston from 'winston';
+import { config } from '../config';
 
-const logLevel = process.env.LOG_LEVEL || 'info';
-const nodeEnv = process.env.NODE_ENV || 'development';
+const logFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  config.nodeEnv === 'development'
+    ? winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    : winston.format.json()
+);
 
 export const logger = winston.createLogger({
-  level: logLevel,
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'realtime-service' },
+  level: config.logging.level,
+  format: logFormat,
+  defaultMeta: { service: 'reporting-service' },
   transports: [
+    new winston.transports.Console(),
     new winston.transports.File({ 
       filename: 'logs/error.log', 
       level: 'error',
       maxsize: 5242880, // 5MB
-      maxFiles: 5
+      maxFiles: 5,
     }),
     new winston.transports.File({ 
       filename: 'logs/combined.log',
       maxsize: 5242880, // 5MB
-      maxFiles: 5
-    })
-  ]
+      maxFiles: 5,
+    }),
+  ],
 });
 
-// Add console transport for development
-if (nodeEnv !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    )
-  }));
+// Create logs directory if it doesn't exist
+import { existsSync, mkdirSync } from 'fs';
+if (!existsSync('logs')) {
+  mkdirSync('logs');
 }
