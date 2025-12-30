@@ -1,23 +1,16 @@
 /**
- * @fileoverview Main package entrypoint.
- * @author Nicholas C. Zakas
+ * @author Toru Nagashima <https://github.com/mysticatea>
  */
-
 "use strict";
 
-const { name, version } = require("../package.json");
-
-//------------------------------------------------------------------------------
-// Public Interface
-//------------------------------------------------------------------------------
+const isCombiningCharacter = require("./is-combining-character");
+const isEmojiModifier = require("./is-emoji-modifier");
+const isRegionalIndicatorSymbol = require("./is-regional-indicator-symbol");
+const isSurrogatePair = require("./is-surrogate-pair");
 
 module.exports = {
-	meta: {
-		name,
-		version,
-	},
-	configs: {
-		all: require("./configs/eslint-all"),
-		recommended: require("./configs/eslint-recommended"),
-	},
+	isCombiningCharacter,
+	isEmojiModifier,
+	isRegionalIndicatorSymbol,
+	isSurrogatePair,
 };

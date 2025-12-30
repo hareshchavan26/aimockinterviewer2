@@ -1,103 +1,129 @@
-[![npm version](https://img.shields.io/npm/v/@eslint/js.svg)](https://www.npmjs.com/package/@eslint/js)
-[![Downloads](https://img.shields.io/npm/dm/@eslint/js.svg)](https://www.npmjs.com/package/@eslint/js)
-[![Build Status](https://github.com/eslint/eslint/workflows/CI/badge.svg)](https://github.com/eslint/eslint/actions)
-<br>
-[![Open Collective Backers](https://img.shields.io/opencollective/backers/eslint)](https://opencollective.com/eslint)
-[![Open Collective Sponsors](https://img.shields.io/opencollective/sponsors/eslint)](https://opencollective.com/eslint)
+# brace-expansion
 
-# ESLint JavaScript Plugin
+[Brace expansion](https://www.gnu.org/software/bash/manual/html_node/Brace-Expansion.html), 
+as known from sh/bash, in JavaScript.
 
-[Website](https://eslint.org) |
-[Configure ESLint](https://eslint.org/docs/latest/use/configure) |
-[Rules](https://eslint.org/docs/rules/) |
-[Contribute to ESLint](https://eslint.org/docs/latest/contribute) |
-[Report Bugs](https://eslint.org/docs/latest/contribute/report-bugs) |
-[Code of Conduct](https://eslint.org/conduct) |
-[X](https://x.com/geteslint) |
-[Discord](https://eslint.org/chat) |
-[Mastodon](https://fosstodon.org/@eslint) |
-[Bluesky](https://bsky.app/profile/eslint.org)
+[![build status](https://secure.travis-ci.org/juliangruber/brace-expansion.svg)](http://travis-ci.org/juliangruber/brace-expansion)
+[![downloads](https://img.shields.io/npm/dm/brace-expansion.svg)](https://www.npmjs.org/package/brace-expansion)
+[![Greenkeeper badge](https://badges.greenkeeper.io/juliangruber/brace-expansion.svg)](https://greenkeeper.io/)
 
-The beginnings of separating out JavaScript-specific functionality from ESLint.
+[![testling badge](https://ci.testling.com/juliangruber/brace-expansion.png)](https://ci.testling.com/juliangruber/brace-expansion)
 
-Right now, this plugin contains two configurations:
+## Example
 
-- `recommended` - enables the rules recommended by the ESLint team (the replacement for `"eslint:recommended"`)
-- `all` - enables all ESLint rules (the replacement for `"eslint:all"`)
+```js
+var expand = require('brace-expansion');
+
+expand('file-{a,b,c}.jpg')
+// => ['file-a.jpg', 'file-b.jpg', 'file-c.jpg']
+
+expand('-v{,,}')
+// => ['-v', '-v', '-v']
+
+expand('file{0..2}.jpg')
+// => ['file0.jpg', 'file1.jpg', 'file2.jpg']
+
+expand('file-{a..c}.jpg')
+// => ['file-a.jpg', 'file-b.jpg', 'file-c.jpg']
+
+expand('file{2..0}.jpg')
+// => ['file2.jpg', 'file1.jpg', 'file0.jpg']
+
+expand('file{0..4..2}.jpg')
+// => ['file0.jpg', 'file2.jpg', 'file4.jpg']
+
+expand('file-{a..e..2}.jpg')
+// => ['file-a.jpg', 'file-c.jpg', 'file-e.jpg']
+
+expand('file{00..10..5}.jpg')
+// => ['file00.jpg', 'file05.jpg', 'file10.jpg']
+
+expand('{{A..C},{a..c}}')
+// => ['A', 'B', 'C', 'a', 'b', 'c']
+
+expand('ppp{,config,oe{,conf}}')
+// => ['ppp', 'pppconfig', 'pppoe', 'pppoeconf']
+```
+
+## API
+
+```js
+var expand = require('brace-expansion');
+```
+
+### var expanded = expand(str)
+
+Return an array of all possible and valid expansions of `str`. If none are
+found, `[str]` is returned.
+
+Valid expansions are:
+
+```js
+/^(.*,)+(.+)?$/
+// {a,b,...}
+```
+
+A comma separated list of options, like `{a,b}` or `{a,{b,c}}` or `{,a,}`.
+
+```js
+/^-?\d+\.\.-?\d+(\.\.-?\d+)?$/
+// {x..y[..incr]}
+```
+
+A numeric sequence from `x` to `y` inclusive, with optional increment.
+If `x` or `y` start with a leading `0`, all the numbers will be padded
+to have equal length. Negative numbers and backwards iteration work too.
+
+```js
+/^-?\d+\.\.-?\d+(\.\.-?\d+)?$/
+// {x..y[..incr]}
+```
+
+An alphabetic sequence from `x` to `y` inclusive, with optional increment.
+`x` and `y` must be exactly one character, and if given, `incr` must be a
+number.
+
+For compatibility reasons, the string `${` is not eligible for brace expansion.
 
 ## Installation
 
-You can install ESLint using npm or other package managers:
+With [npm](https://npmjs.org) do:
 
-```shell
-npm install eslint -D
-# or
-yarn add eslint -D
-# or
-pnpm install eslint -D
-# or
-bun add eslint -D
+```bash
+npm install brace-expansion
 ```
 
-Then install this plugin:
+## Contributors
 
-```shell
-npm install @eslint/js -D
-# or
-yarn add @eslint/js -D
-# or
-pnpm install @eslint/js -D
-# or
-bun add @eslint/js -D
-```
+- [Julian Gruber](https://github.com/juliangruber)
+- [Isaac Z. Schlueter](https://github.com/isaacs)
 
-## Usage
+## Sponsors
 
-Use in your `eslint.config.js` file anytime you want to extend one of the configs:
+This module is proudly supported by my [Sponsors](https://github.com/juliangruber/sponsors)!
 
-```js
-import { defineConfig } from "eslint/config";
-import js from "@eslint/js";
-
-export default defineConfig([
-	// apply recommended rules to JS files
-	{
-		name: "your-project/recommended-rules",
-		files: ["**/*.js"],
-		plugins: {
-			js,
-		},
-		extends: ["js/recommended"],
-	},
-
-	// apply recommended rules to JS files with an override
-	{
-		name: "your-project/recommended-rules-with-override",
-		files: ["**/*.js"],
-		plugins: {
-			js,
-		},
-		extends: ["js/recommended"],
-		rules: {
-			"no-unused-vars": "warn",
-		},
-	},
-
-	// apply all rules to JS files
-	{
-		name: "your-project/all-rules",
-		files: ["**/*.js"],
-		plugins: {
-			js,
-		},
-		extends: ["js/all"],
-		rules: {
-			"no-unused-vars": "warn",
-		},
-	},
-]);
-```
+Do you want to support modules like this to improve their quality, stability and weigh in on new features? Then please consider donating to my [Patreon](https://www.patreon.com/juliangruber). Not sure how much of my modules you're using? Try [feross/thanks](https://github.com/feross/thanks)!
 
 ## License
 
-MIT
+(MIT)
+
+Copyright (c) 2013 Julian Gruber &lt;julian@juliangruber.com&gt;
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
