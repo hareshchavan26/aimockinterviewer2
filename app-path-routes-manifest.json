@@ -1,0 +1,22 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/auth/oauth/github/route": "/api/auth/oauth/github",
+  "/api/auth/oauth/google/route": "/api/auth/oauth/google",
+  "/auth/callback/github/page": "/auth/callback/github",
+  "/auth/callback/google/page": "/auth/callback/google",
+  "/auth/forgot-password/page": "/auth/forgot-password",
+  "/auth/login/page": "/auth/login",
+  "/auth/magic-link/page": "/auth/magic-link",
+  "/auth/register/page": "/auth/register",
+  "/chat/page": "/chat",
+  "/dashboard/page": "/dashboard",
+  "/favicon.ico/route": "/favicon.ico",
+  "/interview/page": "/interview",
+  "/page": "/",
+  "/practice/page": "/practice",
+  "/progress/page": "/progress",
+  "/reports/[id]/page": "/reports/[id]",
+  "/reports/page": "/reports",
+  "/test-fixes/page": "/test-fixes"
+}
