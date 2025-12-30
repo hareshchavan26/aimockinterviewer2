@@ -1,0 +1,53 @@
+{"error":{"code":"ECONNREFUSED"},"level":"error","message":"Failed to get performance report","reportId":"non-existent-id","service":"reporting-service","timestamp":"2025-12-29T13:06:25.192Z"}
+{"error":{"code":"ECONNREFUSED"},"level":"error","message":"Failed to get performance report","reportId":"user","service":"reporting-service","timestamp":"2025-12-29T13:06:25.268Z"}
+{"error":{"code":"ECONNREFUSED"},"level":"error","message":"Failed to get reports by user ID","service":"reporting-service","timestamp":"2025-12-29T13:06:25.310Z","userId":"test-user"}
+{"error":{},"level":"error","message":"Failed to analyze user progress","service":"reporting-service","timestamp":"2025-12-29T13:53:20.538Z","userId":"empty-user"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:35.780Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:35.799Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:10:35.820Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:35.924Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:35.930Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:10:35.932Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:57.505Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:57.529Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:10:57.554Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:57.660Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:10:57.663Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:10:57.666Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:19:28.077Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:19:28.119Z"}
+{"error":{},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:19:28.122Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:19:28.129Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:30:35.569Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:30:35.604Z"}
+{"error":{},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:30:35.608Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:30:35.614Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:32:31.120Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:32:31.158Z"}
+{"error":{},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:32:31.162Z"}
+{"error":{},"level":"error","message":"Encryption failed","service":"reporting-service","timestamp":"2025-12-29T14:32:31.167Z"}
+{"error":{"code":"ERR_CRYPTO_INVALID_IV"},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:33:13.626Z"}
+{"error":{"code":"ERR_CRYPTO_INVALID_IV"},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:33:29.541Z"}
+{"error":{},"level":"error","message":"Failed to analyze user progress","service":"reporting-service","timestamp":"2025-12-29T14:33:29.749Z","userId":"empty-user"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:33:30.457Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:33:30.484Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:33:30.527Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:33:30.735Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:33:30.740Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:33:30.747Z"}
+{"error":{},"level":"error","message":"Failed to analyze user progress","service":"reporting-service","timestamp":"2025-12-29T14:34:06.629Z","userId":"empty-user"}
+{"error":{"code":"ERR_CRYPTO_INVALID_IV"},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:34:06.698Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:06.657Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:06.700Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:34:06.744Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:06.956Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:06.960Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:34:06.961Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:31.958Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:31.987Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:34:32.019Z"}
+{"error":{},"level":"error","message":"Failed to export report to JSON","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:32.131Z"}
+{"error":{},"level":"error","message":"Failed to export report to PDF","reportId":"report-1","service":"reporting-service","timestamp":"2025-12-29T14:34:32.134Z"}
+{"error":{},"level":"error","message":"Failed to export reports to CSV","reportCount":1,"service":"reporting-service","timestamp":"2025-12-29T14:34:32.136Z"}
+{"error":{"code":"ERR_CRYPTO_INVALID_IV"},"level":"error","message":"Decryption failed","service":"reporting-service","timestamp":"2025-12-29T14:34:32.192Z"}
+{"error":{},"level":"error","message":"Failed to analyze user progress","service":"reporting-service","timestamp":"2025-12-29T14:34:32.171Z","userId":"empty-user"}
